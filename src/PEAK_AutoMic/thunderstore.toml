@@ -7,8 +7,8 @@ repository = "https://thunderstore.io"
 [package]
 namespace = "ErikMcClure"
 name = "PEAK_AutoMic"
-description = "TODO: Fill in short mod description."
-websiteUrl = "" # TODO: Add a link to your mod repository here (optional)
+description = "Performs per-player voice volume autoleveling to ensure all players sound perceptually identical."
+websiteUrl = "https://github.com/ErikMcClure/PEAK_AutoMic"
 containsNsfwContent = false
 
 [package.dependencies]
@@ -20,7 +20,7 @@ readme = "../../README.md"
 outdir = "../../artifacts/thunderstore/"
 
 [[build.copy]]
-source = "../../artifacts/bin/PEAK_AutoMic/release/com.github.ErikMcClure.PEAK_AutoMic.dll"
+source = "../../artifacts/bin/PEAK_AutoMic/release/PEAK_AutoMic.dll"
 target = "plugins/"
 
 [[build.copy]]
