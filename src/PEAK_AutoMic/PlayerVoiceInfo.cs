@@ -9,8 +9,8 @@ internal class PlayerVoiceInfo
     private float outputLevel;
     private readonly int processBuffer;
     private bool initialGate;
-    private float avgLUFS;
-    private ulong countLUFS;
+    //private float avgLUFS;
+    //private ulong countLUFS;
 
     public readonly int voiceID;
     public readonly int sampleRateMS;
@@ -24,9 +24,10 @@ internal class PlayerVoiceInfo
    // private const float MAX_DYNAMIC_RANGE = 3.0f;
 
     // This is for whatever the fuck PEAK is doing, holy shit
-    private const float TARGET_LUFS = -33.0f;
-    private const float MAX_DYNAMIC_RANGE = 5.0f; // in LUFS
+    private const float TARGET_LUFS = -28.0f;
+    private const float MAX_DYNAMIC_RANGE = 6.5f; // in LUFS
     private const float INITIAL_LUFS_GATE = -37.0f;
+    private const float MAX_DECAY = 0.0002f;
 
     // This is the approximate LUFS value recorded for a very loud noise at 0 dB from the microphone, serving as a maximum upper bound
     private const float LUFS_CEILING = -15.0f;
@@ -50,8 +51,8 @@ internal class PlayerVoiceInfo
         squaredBuffer = new float[processBuffer];
         //squaredDiff = new float[processBuffer];
         initialGate = false;
-        avgLUFS = 0.0f;
-        countLUFS = 0;
+        //avgLUFS = 0.0f;
+        //countLUFS = 0;
     }
 
     public void ProcessSamples(float[] samples)
@@ -100,7 +101,13 @@ internal class PlayerVoiceInfo
     public float MaxLUFS { get; set; }
 
     public void RecordLUFS(float level)
-    {   
+    {
+        // This decay is a way to allow the mod to recover from a very loud noise
+        if (MaxLUFS > TARGET_LUFS)
+        {
+            MaxLUFS -= MAX_DECAY;
+        }
+
         // TODO: Potentially use a longer 3 second window to calculate MaxLUFS - so far this hasn't been necessary.
         MaxLUFS = Math.Max(level, MaxLUFS);
 
@@ -119,12 +126,12 @@ internal class PlayerVoiceInfo
 
         // Record the current LUFS level but only if it's within MAX_DYNAMIC_RANGE of MaxLUFS
         // TODO: This doesn't work because the initial quiet frames that get sent drag the average down way too much.
-        if(level > (MaxLUFS - MAX_DYNAMIC_RANGE))
+        /*if(level > (MaxLUFS - MAX_DYNAMIC_RANGE))
         {
             countLUFS += 1;
             double delta = level - avgLUFS;
             avgLUFS += (float)(delta / (double)countLUFS);
-        }
+        }*/
 
         // Clamp the maximum dynamic range to MAX_DYNAMIC_RANGE below the target or MAX_DYNAMIC_RANGE below the current detected
         // maximum volume, whatever is smaller, so we don't amplify background noise.

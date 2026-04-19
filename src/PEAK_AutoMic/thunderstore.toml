@@ -7,7 +7,7 @@ repository = "https://thunderstore.io"
 [package]
 namespace = "ErikMcClure"
 name = "PEAK_AutoMic"
-description = "Performs per-player voice volume autoleveling to ensure all players sound perceptually identical."
+description = "Performs per-player voice volume autoleveling to ensure all players sound perceptually identical. Recommended master voices volume at 0.5 for an ideal experience, but you can increase or decrease it as necessary."
 websiteUrl = "https://github.com/ErikMcClure/PEAK_AutoMic"
 containsNsfwContent = false
 

@@ -25,7 +25,7 @@ public partial class Plugin : BaseUnityPlugin
     {
         Log = Logger;
         Harmony = new Harmony(Id);
-        var version = FileVersionInfo.GetVersionInfo(Assembly.GetAssembly(typeof(RemoteVoiceLinkPatches)).Location).ProductVersion;
+        //var version = FileVersionInfo.GetVersionInfo(Assembly.GetAssembly(typeof(RemoteVoiceLinkPatches)).Location).ProductVersion;
 
         /*AppDomain.CurrentDomain.AssemblyLoad += (sender, args) =>
         {

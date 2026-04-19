@@ -25,37 +25,55 @@ namespace PEAK_AutoMic.Patches
         [HarmonyPatch(typeof(VoiceConnection), MethodType.Constructor)]
         public static void Postfix(VoiceConnection __instance)
         {
-            Plugin.Log.LogInfo($"Found VoiceConnection instance: {__instance.name}");
-
-            __instance.RemoteVoiceAdded += __instance_RemoteVoiceAdded;
+            if (__instance != null)
+            {
+                Plugin.Log.LogInfo($"Found VoiceConnection instance: {__instance.name}");
+                __instance.RemoteVoiceAdded += __instance_RemoteVoiceAdded;
+            } else
+            {
+                Plugin.Log.LogError($"VoiceConnection constructor returned NULL????????");
+            }
         }
 
         private static void __instance_RemoteVoiceAdded(RemoteVoiceLink link)
         {
+            if (link == null)
+            {
+                Plugin.Log.LogError($"RemoteVoiceLink was NULL????????");
+                return;
+            }
+
             Plugin.Log.LogInfo($"Found RemoteVoiceLink for player #{link.PlayerId}");
 
             link.FloatFrameDecoded += (frame) =>
             {
                 Photon.Realtime.Player[] playerList = PhotonNetwork.PlayerList;
                 string? userID = null;
-                for (int j = 0; j < playerList.Length; j++)
-                {
-                    if(playerList[j].ActorNumber == link.PlayerId)
+                if (playerList != null) {
+                    for (int j = 0; j < playerList.Length; j++)
                     {
-                        userID = playerList[j].UserId;
-                        //Plugin.Log.LogInfo($"Found player #{playerList[j].ActorNumber} for {playerList[j].UserId} on #{link.PlayerId} ");
-                        break;
+                        if (playerList[j] != null && playerList[j].ActorNumber == link.PlayerId)
+                        {
+                            userID = playerList[j].UserId;
+                            //Plugin.Log.LogInfo($"Found player #{playerList[j].ActorNumber} for {playerList[j].UserId} on #{link.PlayerId} ");
+
+                            if (userID != null)
+                            {
+                                break;
+                            }
+                        }
                     }
                 }
 
-                if (userID != null)
-                {                    
-                    if (!Plugin.PlayerVoices.ContainsKey(userID))
+                if (userID != null && frame != null && frame.Buf != null)
+                {
+                    PlayerVoiceInfo info;
+                    if (!Plugin.PlayerVoices.TryGetValue(userID, out info)) 
                     {
-                        Plugin.PlayerVoices.TryAdd(userID, new PlayerVoiceInfo(link.VoiceInfo.SamplingRate, link.VoiceId));
+                        info = new PlayerVoiceInfo(link.VoiceInfo.SamplingRate, link.VoiceId);
+                        Plugin.PlayerVoices.TryAdd(userID, info);
                     }
                     
-                    var info = Plugin.PlayerVoices[userID];
                     info.ProcessSamples(frame.Buf);
                     float lufs = info.GetShortTermLUFS();
                     info.RecordLUFS(lufs);

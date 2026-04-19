@@ -1,3 +1,10 @@
 # Changelog
 
-TODO: You can follow this format for your changelog: <https://keepachangelog.com/en/1.1.0/>
+## 0.1.2
+
+- Added slow decay to maximum detected LUFS to try to recover from loud noises
+- Changed Target LUFS to -28
+
+## 0.1.1
+
+- Initial Release
