@@ -21,7 +21,7 @@ namespace MicTest
             byte[] header;
 
             {
-                using var fs = new FileStream("D:/mic_test16.wav", FileMode.Open);
+                using var fs = new FileStream("D:/mic_awful24.wav", FileMode.Open);
                 using var reader = new BinaryReader(fs);
 
                 // Skip RIFF header
@@ -37,7 +37,7 @@ namespace MicTest
                 }
             }
 
-            var info = new PlayerVoiceInfo(44100);
+            var info = new PlayerVoiceInfo(24000);
             const int FRAME_COUNT = 4096;
 
             for(int i = 0; i < samples.Length; i += FRAME_COUNT)
@@ -56,7 +56,7 @@ namespace MicTest
             }
 
             {
-                using var fs = new FileStream("D:/mic_test2.wav", FileMode.Create);
+                using var fs = new FileStream("D:/mic_awful2.wav", FileMode.Create);
                 using var w = new BinaryWriter(fs);
                 w.Write(header);
                 foreach (var s in samples)

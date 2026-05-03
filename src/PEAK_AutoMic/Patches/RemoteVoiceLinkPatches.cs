@@ -1,10 +1,12 @@
 ﻿using HarmonyLib;
 using Photon.Pun;
+using Photon.Pun.Demo.Cockpit;
 using Photon.Pun.UtilityScripts;
 using Photon.Realtime;
 using Photon.Voice.Unity;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using UnityEngine;
 using static TMPro.SpriteAssetUtilities.TexturePacker_JsonArray;
@@ -14,14 +16,6 @@ namespace PEAK_AutoMic.Patches
 {
     internal class RemoteVoiceLinkPatches
     {
-        /*[HarmonyPatch(typeof(Room), MethodType.Constructor, new Type[] { typeof(string), typeof(RoomOptions), typeof(bool) })]
-        public static void Postfix(Room __instance, string roomName, RoomOptions options, bool isOffline)
-        {
-            Plugin.Log.LogInfo($"Found Room instance: {__instance.Name}");
-
-            Plugin.RoomReference = __instance;
-        }*/
-
         [HarmonyPatch(typeof(VoiceConnection), MethodType.Constructor)]
         public static void Postfix(VoiceConnection __instance)
         {
@@ -29,7 +23,8 @@ namespace PEAK_AutoMic.Patches
             {
                 Plugin.Log.LogInfo($"Found VoiceConnection instance: {__instance.name}");
                 __instance.RemoteVoiceAdded += __instance_RemoteVoiceAdded;
-            } else
+            }
+            else
             {
                 Plugin.Log.LogError($"VoiceConnection constructor returned NULL????????");
             }
@@ -45,11 +40,37 @@ namespace PEAK_AutoMic.Patches
 
             Plugin.Log.LogInfo($"Found RemoteVoiceLink for player #{link.PlayerId}");
 
-            link.FloatFrameDecoded += (frame) =>
+            // If this player already exists, delete it and recreate it
+
+            lock (PhotonNetwork.PlayerList)
             {
                 Photon.Realtime.Player[] playerList = PhotonNetwork.PlayerList;
-                string? userID = null;
-                if (playerList != null) {
+                if (playerList != null)
+                {
+                    for (int j = 0; j < playerList.Length; j++)
+                    {
+                        if (playerList[j] != null && playerList[j].ActorNumber == link.PlayerId)
+                        {
+                            var userID = playerList[j].UserId;
+
+                            if (userID != null)
+                            {
+                                Plugin.PlayerVoices.TryRemove(userID, out var value);
+                            }
+                        }
+                    }
+                }
+
+            }
+
+            link.FloatFrameDecoded += (frame) =>
+        {
+            string? userID = null;
+            lock (PhotonNetwork.PlayerList)
+            {
+                Photon.Realtime.Player[] playerList = PhotonNetwork.PlayerList;
+                if (playerList != null)
+                {
                     for (int j = 0; j < playerList.Length; j++)
                     {
                         if (playerList[j] != null && playerList[j].ActorNumber == link.PlayerId)
@@ -64,29 +85,49 @@ namespace PEAK_AutoMic.Patches
                         }
                     }
                 }
+            }
 
-                if (userID != null && frame != null && frame.Buf != null)
+            if (userID != null && frame != null && frame.Buf != null)
+            {
+                PlayerVoiceInfo info;
+                if (!Plugin.PlayerVoices.TryGetValue(userID, out info))
                 {
-                    PlayerVoiceInfo info;
-                    if (!Plugin.PlayerVoices.TryGetValue(userID, out info)) 
-                    {
-                        info = new PlayerVoiceInfo(link.VoiceInfo.SamplingRate, link.VoiceId);
-                        Plugin.PlayerVoices.TryAdd(userID, info);
-                    }
-                    
-                    info.ProcessSamples(frame.Buf);
-                    float lufs = info.GetShortTermLUFS();
-                    info.RecordLUFS(lufs);
-                    var level = info.GetOutputLevel() * 0.5f;
-                    var prev = AudioLevels.GetPlayerLevel(userID);
-
-                    if (Math.Abs(level - prev) > 0.01f)
-                    {
-                        AudioLevels.SetPlayerLevel(userID, Math.Clamp(level, 0.0f, 2.0f));
-                        //Plugin.Log.LogInfo($"Link Set level for #{link.PlayerId} to {level}");
-                    }
+                    //Plugin.Log.LogInfo($"Adding player #{link.PlayerId} with sampling rate {link.VoiceInfo.SamplingRate} for ID {userID}");
+                    info = new PlayerVoiceInfo(link.VoiceInfo.SamplingRate, link.VoiceId);
+                    Plugin.PlayerVoices.TryAdd(userID, info);
                 }
-            };
+
+                info.ProcessSamples(frame.Buf);
+                float lufs = info.GetShortTermLUFS();
+                info.RecordLUFS(lufs);
+                var level = info.GetOutputLevel() * 0.5f;
+                var prev = AudioLevels.GetPlayerLevel(userID);
+
+                if (Math.Abs(level - prev) > 0.01f)
+                {
+                    AudioLevels.SetPlayerLevel(userID, Math.Clamp(level, 0.0f, 2.0f));
+                    if (Plugin.LevelsReference != null)
+                    {
+                        lock (Plugin.LevelsReference)
+                        {
+                            Plugin.LevelsReference._dirty = true;
+                        }
+                    }
+                    //Plugin.Log.LogInfo($"Link Set level for #{link.PlayerId} to {level}");
+                }
+            }
+        };
+        }
+
+        // Hook the audiolevels instance so we can mark it as dirty whenever the levels change
+        [HarmonyPatch(typeof(AudioLevels), nameof(AudioLevels.InitNavigation))]
+        [HarmonyPostfix]
+        static void Postfix(AudioLevels __instance)
+        {
+            if (!__instance.mainPage)
+                return;
+
+            Plugin.LevelsReference = __instance;
         }
     }
 }

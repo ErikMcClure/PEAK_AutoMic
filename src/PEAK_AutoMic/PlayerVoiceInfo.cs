@@ -11,9 +11,9 @@ internal class PlayerVoiceInfo
     private bool initialGate;
     //private float avgLUFS;
     //private ulong countLUFS;
+    private float MinLUFS;
 
     public readonly int voiceID;
-    public readonly int sampleRateMS;
 
     private BiQuadFilter preFilter;
     private BiQuadFilter rlbFilter;
@@ -24,10 +24,11 @@ internal class PlayerVoiceInfo
    // private const float MAX_DYNAMIC_RANGE = 3.0f;
 
     // This is for whatever the fuck PEAK is doing, holy shit
-    private const float TARGET_LUFS = -28.0f;
+    private const float TARGET_LUFS = -27.0f;
     private const float MAX_DYNAMIC_RANGE = 6.5f; // in LUFS
-    private const float INITIAL_LUFS_GATE = -37.0f;
-    private const float MAX_DECAY = 0.0002f;
+    private const float INITIAL_LUFS_GATE = -47.0f;
+    private const float NOISE_GATE = 4.0f; 
+    private const float MAX_DECAY = 0.01f;
 
     // This is the approximate LUFS value recorded for a very loud noise at 0 dB from the microphone, serving as a maximum upper bound
     private const float LUFS_CEILING = -15.0f;
@@ -38,16 +39,17 @@ internal class PlayerVoiceInfo
     private float runningSum = 0;
     //private float runningDiff = 0;
     private int sampleCount = 0;
+    private int falloffCount = 0;
 
     public PlayerVoiceInfo(int samplingRate, int voiceId = -1)
     {
         preFilter = BiQuadFilter.HighShelf((float)samplingRate, 1500.0f, 0.707f, 4.0f);
         rlbFilter = BiQuadFilter.HighPassFilter((float)samplingRate, 100.0f, 0.707f);
         MaxLUFS = -300.0f;
+        MinLUFS = TARGET_LUFS + MAX_DYNAMIC_RANGE;
         outputLevel = 1.0f;
         voiceID = voiceId;
-        sampleRateMS = samplingRate / 1000;
-        processBuffer = TERM_MS * sampleRateMS;
+        processBuffer = (TERM_MS * samplingRate) / 1000;
         squaredBuffer = new float[processBuffer];
         //squaredDiff = new float[processBuffer];
         initialGate = false;
@@ -82,6 +84,8 @@ internal class PlayerVoiceInfo
             //squaredDiff[bufferIndex] = diffsq;
             //runningDiff += diffsq;
         }
+
+        falloffCount += samples.Length;
     }
 
     //public float GetVariance() { return runningDiff / sampleCount; }
@@ -102,14 +106,25 @@ internal class PlayerVoiceInfo
 
     public void RecordLUFS(float level)
     {
-        // This decay is a way to allow the mod to recover from a very loud noise
-        if (MaxLUFS > TARGET_LUFS)
+        if (sampleCount < processBuffer)
         {
-            MaxLUFS -= MAX_DECAY;
+            return;
+        }
+
+            // This decay is a way to allow the mod to recover from a very loud noise
+            if (falloffCount > processBuffer)
+        {
+            //Plugin.Log.LogInfo($"FALLOFF: {falloffCount}, {MaxLUFS}, {TARGET_LUFS}, {MAX_DECAY}");
+            if (MaxLUFS > TARGET_LUFS)
+            {
+                MaxLUFS -= MAX_DECAY;
+            }
+            falloffCount -= processBuffer;
         }
 
         // TODO: Potentially use a longer 3 second window to calculate MaxLUFS - so far this hasn't been necessary.
         MaxLUFS = Math.Max(level, MaxLUFS);
+        MinLUFS = Math.Min(level, MinLUFS);
 
         // Gate 
         if (!initialGate)
@@ -138,7 +153,12 @@ internal class PlayerVoiceInfo
         //float clampLUFS = Math.Max(Math.Min(TARGET_LUFS, avgLUFS) - MAX_DYNAMIC_RANGE, level);
         float clampLUFS = Math.Max(MaxLUFS - MAX_DYNAMIC_RANGE, level);
 
-        outputLevel = (float)Math.Pow(10.0, (TARGET_LUFS - clampLUFS) / 20.0);
+        // Reduce all sound within NOISE_GATE range of MinLUFS to nearly silent.
+        double range = Math.Min((level - MinLUFS) / NOISE_GATE, 1.0);
+        double ngate = Math.Sin(range * Math.PI * 0.5); // (sin(x))^2 from 0 to pi/2 makes a nice smooth curve
+        ngate = ngate * ngate  * ngate * ngate; // We make it sin^4 to give it a flatter curve near 0
+
+        outputLevel = (float)Math.Pow(10.0, (TARGET_LUFS - clampLUFS) / 20.0) * (float)ngate;
     }
 
     public float GetOutputLevel() { return outputLevel; }
