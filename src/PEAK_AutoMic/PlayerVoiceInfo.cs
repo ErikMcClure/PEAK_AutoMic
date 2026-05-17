@@ -28,7 +28,7 @@ internal class PlayerVoiceInfo
     private const float MAX_DYNAMIC_RANGE = 6.5f; // in LUFS
     private const float INITIAL_LUFS_GATE = -47.0f;
     private const float NOISE_GATE = 4.0f; 
-    private const float MAX_DECAY = 0.01f;
+    private const float MAX_DECAY = 0.04f;
 
     // This is the approximate LUFS value recorded for a very loud noise at 0 dB from the microphone, serving as a maximum upper bound
     private const float LUFS_CEILING = -15.0f;

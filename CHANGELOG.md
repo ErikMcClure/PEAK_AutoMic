@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4
+
+- Increase decay amount
+
 ## 0.1.3
 
 - Fixed race condition causing random crashes on join
